@@ -10,7 +10,7 @@ import Data.Generic.Rep (Argument(..), Constructor(..), NoArguments(..), NoConst
 import Data.List (List(..), fromFoldable, null, singleton, toUnfoldable, (:))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
-import Foreign (F, Foreign, ForeignError(..), fail, readArray, readString, unsafeToForeign)
+import Foreign (F, Foreign, ForeignError(..), fail, readArray, readString, unsafeToForeign, isUndefined)
 import Foreign.Class (class Encode, class Decode, encode, decode)
 import Foreign.Generic.Types (Options, SumEncoding(..))
 import Foreign.Index (index)
@@ -66,6 +66,13 @@ instance genericDecodeConstructor
                  args <- mapExcept (lmap (map (ErrorAtProperty contentsFieldName)))
                            (index f contentsFieldName >>= readArguments)
                  pure (Constructor args)
+               ObjectWithSingleField -> do
+                  ob <- index f ctorName
+                  when (isUndefined ob) $
+                    fail (ForeignError ("Expected " <> show ctorName <> " key"))
+                  args <- mapExcept (lmap (map (ErrorAtProperty ctorName)))
+                                    (readArguments ob)
+                  pure (Constructor args)
     where
       ctorName = reflectSymbol (SProxy :: SProxy name)
 
@@ -96,6 +103,9 @@ instance genericEncodeConstructor
                TaggedObject { tagFieldName, contentsFieldName, constructorTagTransform } ->
                  unsafeToForeign (Object.singleton tagFieldName (unsafeToForeign $ constructorTagTransform ctorName)
                            `Object.union` maybe Object.empty (Object.singleton contentsFieldName) (encodeArgsArray args))
+               ObjectWithSingleField ->
+                 let o = maybe (unsafeToForeign Object.empty) identity (encodeArgsArray args)
+                 in unsafeToForeign (Object.singleton ctorName o)
     where
       ctorName = reflectSymbol (SProxy :: SProxy name)
 
@@ -187,7 +197,7 @@ instance encode_Record :: (RowToList r rl, EncodeRecord r rl) => Encode_ (Record
   encode_ opts = unsafeToForeign <<< encodeRecord_ (RLProxy :: RLProxy rl) opts
 else instance encode_Other :: Encode a => Encode_ a where
   encode_ _ = encode
-  
+
 class DecodeRecord r rl | rl -> r where
   decodeRecord_ :: RLProxy rl -> Options -> Foreign -> F (Builder {} (Record r))
 
@@ -200,7 +210,7 @@ instance decodeRecordNil :: DecodeRecord () Nil where
 instance encodeRecordNil :: EncodeRecord () Nil where
   encodeRecord_ _ _ _ = Object.empty
 
-instance decodeRecordCons 
+instance decodeRecordCons
     :: ( Cons l a r_ r
        , DecodeRecord r_ rl_
        , IsSymbol l

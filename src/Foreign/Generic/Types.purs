@@ -16,3 +16,4 @@ data SumEncoding
     , contentsFieldName :: String
     , constructorTagTransform :: String -> String
     }
+  | ObjectWithSingleField

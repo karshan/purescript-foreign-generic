@@ -3,6 +3,7 @@
   "moduleType": [
     "node"
   ],
+  "version": "7.0.1",
   "ignore": [
     "**/.*",
     "node_modules",
