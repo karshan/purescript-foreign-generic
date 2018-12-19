@@ -104,7 +104,7 @@ instance genericEncodeConstructor
                  unsafeToForeign (Object.singleton tagFieldName (unsafeToForeign $ constructorTagTransform ctorName)
                            `Object.union` maybe Object.empty (Object.singleton contentsFieldName) (encodeArgsArray args))
                ObjectWithSingleField ->
-                 let o = maybe (unsafeToForeign Object.empty) identity (encodeArgsArray args)
+                 let o = maybe (unsafeToForeign []) identity (encodeArgsArray args)
                  in unsafeToForeign (Object.singleton ctorName o)
     where
       ctorName = reflectSymbol (SProxy :: SProxy name)
