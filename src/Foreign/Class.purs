@@ -6,11 +6,8 @@ import Control.Monad.Except (except, mapExcept)
 import Data.Array ((..), zipWith, length)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
-import Data.Map (Map)
-import Data.Map as Map
 import Data.Maybe (Maybe, maybe)
 import Data.Traversable (sequence)
-import Data.Tuple (Tuple)
 import Foreign (F, Foreign, ForeignError(..), readArray, readBoolean, readChar, readInt, readNumber, readString, unsafeToForeign)
 import Foreign.Internal (readObject)
 import Foreign.NullOrUndefined (readNullOrUndefined, undefined)
@@ -73,9 +70,6 @@ instance maybeDecode :: Decode a => Decode (Maybe a) where
 instance objectDecode :: Decode v => Decode (Object v) where
   decode = sequence <<< Object.mapWithKey (\_ -> decode) <=< readObject
 
-instance mapDecode :: Decode v => Decode (Map String v) where
-  decode = map (Map.fromFoldable <<< (identity :: forall a. Array a -> Array a) <<< Object.toUnfoldable) <<< decode
-
 -- | The `Encode` class is used to generate encoding functions
 -- | of the form `a -> Foreign` using `generics-rep` deriving.
 -- |
@@ -126,8 +120,3 @@ instance maybeEncode :: Encode a => Encode (Maybe a) where
 
 instance objectEncode :: Encode v => Encode (Object v) where
   encode = unsafeToForeign <<< Object.mapWithKey (\_ -> encode)
-
-instance mapEncode :: Encode v => Encode (Map String v) where
-  encode =
-    let theArray = (identity :: forall a. Array a -> Array a)
-    in encode <<< Object.fromFoldable <<< theArray <<< Map.toUnfoldable
