@@ -3,12 +3,15 @@ module Foreign.Class where
 import Prelude
 
 import Control.Monad.Except (except, mapExcept)
-import Data.Array ((..), zipWith, length)
+import Data.Array ((..), (!!), zipWith, length)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe, maybe)
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Traversable (sequence)
-import Foreign (F, Foreign, ForeignError(..), readArray, readBoolean, readChar, readInt, readNumber, readString, unsafeToForeign)
+import Data.Tuple (Tuple (..))
+import Foreign (F, Foreign, ForeignError(..), readArray, readBoolean, readChar, readInt, readNumber, readString, unsafeToForeign, fail)
 import Foreign.Internal (readObject)
 import Foreign.NullOrUndefined (readNullOrUndefined, undefined)
 import Foreign.Object (Object)
@@ -120,3 +123,21 @@ instance maybeEncode :: Encode a => Encode (Maybe a) where
 
 instance objectEncode :: Encode v => Encode (Object v) where
   encode = unsafeToForeign <<< Object.mapWithKey (\_ -> encode)
+
+instance tupleEncode :: (Encode a, Encode b) => Encode (Tuple a b) where
+  encode (Tuple a b) = encode [ encode a, encode b ]
+
+instance tupleDecode :: (Decode a, Decode b) => Decode (Tuple a b) where
+  decode fTuple = do
+    arrF <- decode fTuple
+    a <- maybe (fail (ForeignError "tupleDecode")) decode (arrF !! 0)
+    b <- maybe (fail (ForeignError "tupleDecode")) decode (arrF !! 1)
+    pure $ Tuple a b
+
+instance mapEncode :: (Encode k, Encode v) => Encode (Map k v) where
+  encode =
+    let theArray = (identity :: forall a. Array a -> Array a)
+    in encode <<< theArray <<< Map.toUnfoldable
+
+instance mapDecode :: (Ord k, Decode k, Decode v) => Decode (Map k v) where
+  decode = map (Map.fromFoldable <<< (identity :: forall a. Array a -> Array a)) <<< decode
