@@ -134,10 +134,16 @@ instance tupleDecode :: (Decode a, Decode b) => Decode (Tuple a b) where
     b <- maybe (fail (ForeignError "tupleDecode")) decode (arrF !! 1)
     pure $ Tuple a b
 
-instance mapEncode :: (Encode k, Encode v) => Encode (Map k v) where
+instance stringMapEncode :: Encode v => Encode (Map String v) where
+  encode =
+    let theArray = (identity :: forall a. Array a -> Array a)
+    in encode <<< Object.fromFoldable <<< theArray <<< Map.toUnfoldable
+else instance mapEncode :: (Encode k, Encode v) => Encode (Map k v) where
   encode =
     let theArray = (identity :: forall a. Array a -> Array a)
     in encode <<< theArray <<< Map.toUnfoldable
 
-instance mapDecode :: (Ord k, Decode k, Decode v) => Decode (Map k v) where
+instance stringMapDecode :: Decode v => Decode (Map String v) where
+    decode = map (Map.fromFoldable <<< (identity :: forall a. Array a -> Array a) <<< Object.toUnfoldable) <<< decode
+else instance mapDecode :: (Ord k, Decode k, Decode v) => Decode (Map k v) where
   decode = map (Map.fromFoldable <<< (identity :: forall a. Array a -> Array a)) <<< decode
